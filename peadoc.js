@@ -269,19 +269,20 @@ An ordered entry begins with a line starting with whitespace
 followed by a number followed by . or ) followed by whitespace.
 
 The entry includes all text following the prefix
-up until the next line that does not begin with whitespace,
+up until the next line that either has an unordered or ordered list prefix
+or does not begin with whitespace,
 excluding any trailing empty lines.
 Note that this means that an unordered or ordered entry
 may contain any number of empty lines,
 so long as there is a following line that begins with whitespace.
 
 Within an unordered or ordered entry text is formatted as a paragraph
-nestned within the item of an unordored or ordered list item.
+nested within the item of an unordored or ordered list item.
 Empty lines within the entry's text is considered a paragraph break.
 Within each such paragraph, leading and trailing whitespace is removed,
 and runs of whitespace are collapsed to a single space character.
 
-Multiple entry items of the same type for a single list.
+Multiple entry items of the same type form a single list.
 Ordered entries in a single list are renumbered to count up from 1.
 
 
