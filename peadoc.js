@@ -1,122 +1,204 @@
-const leadingSpaceRegexp = /^\s+/;
-const listRegexp = /^\s+([*\-]|[0-9]+[.)])/;
-const unorderedRegexp = /^\s+[*\-]/;
-const orderedRegexp = /^\s+[0-9]+[.)]/;
+const EMPTY = "EMPTY";
+const HEADING = "HEADING";
+const TEXT = "TEXT";
+const UITEM = "UITEM";
+const OITEM = "OITEM";
+const PRE = "PRE";
 
-const NORMAL = "normal";
-const ORDERED = "ordered";
-const UNORDERED = "unordered";
-const PREFORMATTED = "preformatted";
+const ulistPrefix = /^\s+[-*]\s+/;
+const olistPrefix = /^\s+[0-9]+[.\)]\s+/;
+const prePrefix = /^[   \t]+/;
 
-let lines = [];
-
-function collapseSpace(str) {
-	return str.replace(/[   \t]+/g, ' ').replace(/^ +/mg, '');
-}
-
-function normal() {
-	let text = "";
-	while (lines.length > 0 && lines[0] != "" && !leadingSpaceRegexp.test(lines[0])) {
-		if (text != "") {
-			text += "\n";
+function getItems(text) {
+	let items = [];
+	let lines = text.split(/\n/m);
+	let heading = true;
+	let n = 0;
+	while (lines.length > 0) {
+		const line = lines[0];
+		let type = EMPTY;
+		let more = function(line) { return false; };
+		let preIndent = "";
+		if (heading) {
+			type = HEADING;
+			more = function(line) { return line != ""; };
+			heading = false;
+		} else if (line == "") {
+			type = EMPTY;
+			more = function(line) { return line == ""; };
+		} else if (ulistPrefix.test(line)) {
+			type = UITEM
+			more = function(line) {
+				return line == "" || prePrefix.test(line) && !ulistPrefix.test(line) && !olistPrefix.test(line);
+			};
+		} else if (olistPrefix.test(line)) {
+			type = OITEM
+			more = function(line) {
+				return line == "" || prePrefix.test(line) && !ulistPrefix.test(line) && !olistPrefix.test(line);
+			};
+		} else if (prePrefix.test(line)) {
+			type = PRE;
+			preIndent = leadingSpace(line);
+			more = function(line) {
+				if (line == "") {
+					return true;
+				}
+				if (ulistPrefix.test(line) || olistPrefix.test(line)) {
+					return false;
+				}
+				const indent = leadingSpace(line);
+				const common = commonSpace(preIndent, indent);
+				if (common == "") {
+					return false;
+				}
+				preIndent = common;
+				return true;
+			};
+		} else {
+			type = TEXT;
+			more = function(line) { return line != "" && leadingSpace(line) == ""; };
 		}
-		text += lines[0];
-		lines.shift();
-	}
-	return {type: NORMAL, text: collapseSpace(text)};
-}
-
-function moreListLines(lines) {
-	return lines.length == 0 ||
-		leadingSpaceRegexp.test(lines[0]) && !listRegexp.test(lines[0])||
-		lines[0] == "" && lines.length == 1 ||
-		lines[0] == "" && leadingSpaceRegexp.test(lines[1]) && !listRegexp.test(lines[1]);
-}
-
-function unordered() {
-	let text = lines[0].replace(unorderedRegexp, '');
-	lines.shift();
-	while (moreListLines(lines)) {
-		if (lines[0] == "") {
-			if (lines.length > 1 && !leadingSpaceRegexp.test(lines[1])) {
+		let item = {
+			type: type,
+			lines: [line],
+		};
+		let nonEmpty = false;
+		for (let i = 1; i < lines.length; i++) {
+			if (!more(lines[i])) {
 				break;
 			}
-			text += "\n"
-		} else {
-			text += lines[0];
+			item.lines.push(lines[i]);
 		}
-		lines.shift();
-	}
-	return {type: UNORDERED, text: collapseSpace(text)};
-}
-
-function ordered() {
-	let text = lines[0].replace(orderedRegexp, '');
-	lines.shift();
-	while (moreListLines(lines)) {
-		if (lines[0] == "") {
-			text += "\n"
-		} else {
-			text += lines[0];
+		while (item.type != EMPTY && item.lines.length > 0 && item.lines[item.lines.length-1] == "") {
+			item.lines.pop();
 		}
-		lines.shift();
-	}
-	return {type: ORDERED, text: collapseSpace(text)};
-}
-
-function preformatted() {
-	let text = lines[0] + '\n';
-	lines.shift();
-	while (lines.length > 0 && lines[0] == "" || leadingSpaceRegexp.test(lines[0])) {
-		text += lines[0] + '\n'
-		lines.shift();
-	}
-	return {type: PREFORMATTED, text: text};
-}
-
-function paragraph() {
-	let paragraph = [];
-	let i = 0;
-	while (lines.length > 0 && lines[0] != "") {
-		let block = {};
-		if (unorderedRegexp.test(lines[0])) {
-			block = unordered();
-		} else if (orderedRegexp.test(lines[0])) {
-			block = ordered();
-		} else if (leadingSpaceRegexp.test(lines[0])) {
-			block = preformatted();
-		} else {
-			block = normal();
-		}
-		paragraph.push(block);
-	}
-	return paragraph;
-}
-
-function section() {
-	let heading = "";
-	while (lines.length > 0 && lines[0] != "") {
-		if (heading != "") {
-			heading += "\n";
-		}
-		heading += lines[0];
-		lines.shift();
-	}
-
-	let paragraphs = [];
-	while (lines.length > 0) {
-		paragraphs.push(paragraph());
-		if (lines.length > 2 && lines[0] == "" && lines[1] == "") {
+		if (item.lines.length == 0) {
+			console.log("IMPOSSIBLE");
 			break;
 		}
-		if (lines.length > 0) {
-			lines.shift(); // remove paragraph-ending the blank line.
+		for (let i = 0; i < item.lines.length; i++) {
+			lines.shift();
+		}
+
+		if (item.type == UITEM) {
+			item.lines[0] = item.lines[0].replace(ulistPrefix, "");
+		} else if (item.type == OITEM) {
+			item.lines[0] = item.lines[0].replace(olistPrefix, "");
+		} else if (item.type == PRE) {
+			for (let i = 0; i < item.lines.length; i++) {
+				item.lines[i] = item.lines[i].replace(preIndent, "");
+			}
+		}
+		if (item.type != PRE) {
+			for (let i = 0; i < item.lines.length; i++) {
+				item.lines[i] = item.lines[i].replace(prePrefix, "").replace(/\s+/g, ' ');
+			}
+		}
+		if (item.type == EMPTY) {
+			heading = item.lines.length > 1;
+			continue;
+		}
+		items.push(item);
+	}
+	return items;
+}
+
+function commonSpace(a, b) {
+	let common = "";
+	for (let i = 0; i < Math.min(a.length, b.length); i++) {
+		if (a[i] != b[i]) {
+			break;
+		}
+		common += a[i];
+	}
+	return common;
+}
+
+function leadingSpace(line) {
+	let space = "";
+	for (const c of line) {
+		if (!isSpace(c)) {
+			break;
+		}
+		space += c;
+	}
+	return space
+}
+
+function isSpace(c) {
+	return /\s/.test(c);
+}
+
+function update() {
+	let html = "";
+	let closing = "";
+	let prev = EMPTY;
+	const src = document.getElementById('raw').innerText;
+	for (const item of getItems(src)) {
+		if (closing != "" && item.type != prev) {
+			html += closing;
+		}
+		if (item.type == HEADING) {
+			html += "<h1>\n" + escapeLines(item.lines) + "</h1>\n";
+			closing = "";
+		} else if (item.type == TEXT) {
+			html += "<p>\n" + escapeLines(item.lines) + "</p>\n";
+			closing = "";
+		} else if (item.type == PRE) {
+			html += "<pre>\n" + escapeLines(item.lines) + "</pre>\n";
+			closing = "";
+		} else if (item.type == OITEM || item.type == UITEM) {
+			if (prev != item.type) {
+				if (item.type == UITEM) {
+					html += "<ul>\n";
+					closing = "</ul>\n";
+				} else {
+					html += "<ol>\n";
+					closing = "</ol>\n";
+				}
+			}
+			if (!hasEmptyLine(item.lines)) {
+				html += "<li>\n" + escapeLines(item.lines) + "</li>\n";
+			} else {
+				html += "	<li>\n		<p>\n";
+				for (const line of item.lines) {
+					if (line == "") {
+						html += "		</p>\n		<p>\n";
+						continue;
+					}
+					html += escapeHtml(line);
+					html += "\n";
+				}
+				html += "		</p>\n	</li>\n";
+			}
+		} else {
+			console.log("impossible item type: ", item.type);
+		}
+		prev = item.type;
+	}
+	if (closing != "") {
+		html += closing;
+	}
+	console.log("html=\n", html);
+	document.getElementById('pretty').innerHTML= html;
+}
+
+function hasEmptyLine(lines) {
+	for (const line of lines) {
+		if (line == "") {
+			return true;
 		}
 	}
-	return {
-		heading: collapseSpace(heading),
-		paragraphs: paragraphs,
-	};
+	return false;
+}
+
+function escapeLines(lines) {
+	let html = "";
+	for (const line of lines) {
+		html += escapeHtml(line);
+		html += "\n";
+	}
+	return html;
 }
 
 function escapeHtml(unsafe)
@@ -129,161 +211,107 @@ function escapeHtml(unsafe)
 		.replace(/'/g, "&#039;");
  }
 
-function update() {
-	const src = document.getElementById('raw').innerText;
-	lines = src.split('\n');
-
-	let sections = [];
-	while (lines.length > 0) {
-		sections.push(section());
-		// Remove section ending blank lines.
-		while (lines.length > 0 && lines[0] == "") {
-			lines.shift();
-		}
-	}
-
-	let html = "";
-	for (let section of sections) {
-		html += '<h1>';
-		html += escapeHtml(section.heading).replace('\n', '<br>');
-		html += '</h1>\n';
-		for (let paragraph of section.paragraphs) {
-			if (paragraph.length == 0) {
-				continue;
-			}
-			let prev = NORMAL;
-			html += '<p>\n';
-			for (let block of paragraph) {
-				if (block.type == NORMAL) {
-					if (prev == ORDERED) {
-						html += '</ol>\n';
-					} else if (prev == UNORDERED) {
-						html += '</ul>\n';
-					}
-					prev = NORMAL;
-					html += escapeHtml(block.text);
-					html += '\n';
-				} else if (block.type == UNORDERED) {
-					if (prev == ORDERED) {
-						html += '</ol>\n';
-					}
-					if (prev != UNORDERED) {
-						html += '<ul>\n';
-					}
-					prev = UNORDERED;
-					html += '	<li>\n';
-					for (let line of block.text.split('\n')) {
-						if (line == "") {
-							continue;
-						}
-						html += '		<p>' + escapeHtml(line) + '</p>\n';
-					}
-					html += '	</li>\n';
-				} else if (block.type == ORDERED) {
-					if (prev == UNORDERED) {
-						html += '</ul>\n';
-					}
-					if (prev != ORDERED) {
-						html += '<ol>\n';
-					}
-					prev = ORDERED;
-					html += '	<li>\n';
-					for (let line of block.text.split('\n')) {
-						if (line == "") {
-							continue;
-						}
-						html += '		<p>' + escapeHtml(line) + '</p>\n';
-					}
-					html += '	</li>\n';
-				} else if (block.type == PREFORMATTED) {
-					if (prev == ORDERED) {
-						html += '</ol>\n';
-					} else if (prev == UNORDERED) {
-						html += '</ul>\n';
-					}
-					prev = PREFORMATTED;
-					html += '<pre>' + escapeHtml(block.text) + '</pre>\n';
-				}
-			}
-			if (prev == ORDERED) {
-				html += '</ol>\n';
-			} else if (prev == UNORDERED) {
-				html += '</ul>\n';
-			}
-			html += '</p>\n';
-		}
-	}
-	console.log("html=\n", html);
-	document.getElementById('pretty').innerHTML= html;
-}
-
-const spec =`Introduction
+const spec =`
+Peadoc
 
 Peadoc is a minimalistic document formatting system useful for documentation in source code. It is intended to be easy-to-read, and out-of-the way in normal text, but also easy to convert to richer formats like HTML.
 
 The intent of Peadoc is not to write papers or books. It is intended for documentation appearing in code such as function comments or library-level comments. As such, it includes only features needed for short documents, and it attempts to avoid special markup syntax beyond items that one may happen to use otherwise when writing a non-marked-up "raw" text (such as - and * for list items).
 
 
-The beginning and the end
+Items
 
-Empty lines at the beginning of the file are ignored.
+A document is divided into items. Each item is of one of the following types:
 
-The end-of-file and all immediately preceding empty lines are treated as-if a single empty line.
-
-A text begins at either at the beginning of a new section (full mode) or at the beginning of a paragraph (partial mode).
-
-
-Sections
-
-A section begins with a heading and is followed, optionally, by blocks.
-
-A section heading is a sequence of non-empty lines.
-Runs of non-newline whitespace in a section heading are replaced by single spaces.
-Line-leading whitespace in a section heading is removed.
+    * empty
+    * heading
+    * text
+    * unordered entry
+    * ordered entry
+    * preformatted
 
 
-Paragraphs
+Empty items
 
-After a section header is a possibly empty sequence of paragraphs. Paragraphs can contain normal text, lists, and pre-formatted blocks.
+An empty item is a sequence of consecutive empty lines.
+When formatting text empty items are ignored except for their role in delimiting other items.
+If an empty item consists of more than a single empty line,
+it delimits a section: the following item is interpreted as a heading.
+Otherwise the empty item delimits the preceeding item.
 
-A line that does not begin with whitespace is a normal text line.
-A line beginning with whitespace followed by -, *, or a number followed by . or ) begins a list item.
-Any other line beginning with whitespace begins a pre-formatted block.
-
-Two or more blank lines that are not part of a pre-formatted block end the current section and begin a new one.
-A single blank line that is not part of a list item or pre-formatted block ends the paragraph.
-
-
-Normal text
-
-Runs of whitespace within normal text are replaced with a single space.
+Note that preformatted, unordered entry, and ordered entry items
+may contain empty lines than are not empty items.
+This is determined by the rules of how each of the items are delimited.
+See below for details.
 
 
-Lists
+Heading items
 
-A list item starts with a line that begins with whitespace followed by -, *, or a number followed by . or ) and it contains all following lines that are either begin with whitespace and are not themselves list items or are a single empty line followed by a line that begins with whitespace and is not a list item.
-
-Text within a list item is in paragraphs of normal text where empty lines within the item denote paragraph breaks.
-
-A list item preceded by another list item of the same type (unordered/ordered) belongs to the same list. Otherwise it begins a new list within the containing paragraph.
-
-Ordered lists are re-numbered from 1. Lists cannot nest, and they cannot contain pre-formatted text.
+A heading item is text following an empty item that has more than two empty lines.
+It includes all text up until, but excluding, the next empty line.
+A heading item is formatted as a section heading.
 
 
-Pre-formatted text
+Text items
 
-A block of pre-formatted text starts with a line that begins with whitespace that is not a list item, and it contains all following lines up until the first line that does not begin with a common prefix of leading whitespace.
+A text item is a sequence of consecutive lines that do not begin with whitespace.
+Text items are formatted as paragraphs.
+Any trailing whitespace is removed,
+and runs of whitespace are collapsed to a single space character.
 
-The longest common prefix of leading whitespace is removed from all lines of the pre-formatted text block. Trailing empty lines are also removed.
+
+Unordered and Ordered entry items
+
+Unordered and ordered entries are items in a list.
+
+An unordered entry begins with a line starting with whitespace
+followed by - or * and more whitespace.
+An ordered entry begins with a line starting with whitespace
+followed by a number followed by . or ) followed by whitespace.
+
+The entry includes all text following the prefix
+up until the next line that does not begin with whitespace,
+excluding any trailing empty lines.
+Note that this means that an unordered or ordered entry
+may contain any number of empty lines,
+so long as there is a following line that begins with whitespace.
+
+Within an unordered or ordered entry text is formatted as a paragraph
+nestned within the item of an unordored or ordered list item.
+Empty lines within the entry's text is considered a paragraph break.
+Within each such paragraph, leading and trailing whitespace is removed,
+and runs of whitespace are collapsed to a single space character.
+
+Multiple entry items of the same type for a single list.
+Ordered entries in a single list are renumbered to count up from 1.
+
+
+Preformatted items
+
+A preformatted item is a block of pre-formatted text.
+
+A preformatted item begins with a line starting with whitespace
+that is not an unordered entry or an ordered entry.
+It then includes all of the following empty lines
+and lines that share a common whitespace prefix with the initial line
+excluding any trailing empty lines.
+
+The common whitespace prefix is removed from each line.
+No other spaces are stripped or collapsed,
+and the resulting lines are formatted in a monospace font.
 
 
 Hyperlinks
 
-If the final paragraph contains all lines of the form
-    [text]: URL
-then it is interpreted as a bibliography.
+If the final item of a document is a text item where every line is of the form:
 
-In formats where possible, all non-preformatted occurrences of [text] outside the bibliography are replaced by the text as the text of a hyperlink linking to the corresponding URL.
+    [text]: URL
+
+Then it is interpreted as a list of citations.
+In formats that support hyperlinks,
+all occurrances of each [text] within non-preformatted items of the document
+are replaced with the text itself (the [ and ] are removed)
+and are made into hyperlinks to the corresponding URL.
 `
 
 document.getElementById('raw').innerText = spec;
