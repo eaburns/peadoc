@@ -10,22 +10,29 @@ body {
 	height: 100vh;
 }
 
-pre {
-	background-color: #EEEEEE;
-	margin-left: 10px;
-	margin-right: 10px;
-}
-
 #raw {
 	grid-column: 1;
-	background-color: #FEF0E8;
 	outline: none;
 	padding-left: 10px;
 	padding-right: 10px;
+	background-color: #FEF0E8;
+	font-family: sans-serif;
 }
 
 #pretty {
 	grid-column: 2;
 	margin-left: 10px;
 	margin-right: 10px;
+	font-family: sans-serif;
+}
+
+h1 {
+	color: #5B7C99;
+}
+
+pre {
+	margin-left: 25px;
+	margin-right: 40px;
+	padding: 10px 10px 10px 10px;
+	background-color: #F5F5F5;
 }
