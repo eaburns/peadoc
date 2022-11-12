@@ -179,7 +179,6 @@ function update() {
 	if (closing != "") {
 		html += closing;
 	}
-	console.log("html=\n", html);
 	document.getElementById('pretty').innerHTML= html;
 }
 
