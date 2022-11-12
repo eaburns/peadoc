@@ -11,7 +11,7 @@ const PREFORMATTED = "preformatted";
 let lines = [];
 
 function collapseSpace(str) {
-	return str.replace(/[   \t]+/g, ' ').replace(/^ +/, '');
+	return str.replace(/[   \t]+/g, ' ').replace(/^ +/mg, '');
 }
 
 function normal() {
@@ -26,11 +26,21 @@ function normal() {
 	return {type: NORMAL, text: collapseSpace(text)};
 }
 
+function moreListLines(lines) {
+	return lines.length == 0 ||
+		leadingSpaceRegexp.test(lines[0]) && !listRegexp.test(lines[0])||
+		lines[0] == "" && lines.length == 1 ||
+		lines[0] == "" && leadingSpaceRegexp.test(lines[1]) && !listRegexp.test(lines[1]);
+}
+
 function unordered() {
 	let text = lines[0].replace(unorderedRegexp, '');
 	lines.shift();
-	while (lines.length > 0 && (lines[0] == "" || leadingSpaceRegexp.test(lines[0]) && !listRegexp.test(lines[0]))) {
+	while (moreListLines(lines)) {
 		if (lines[0] == "") {
+			if (lines.length > 1 && !leadingSpaceRegexp.test(lines[1])) {
+				break;
+			}
 			text += "\n"
 		} else {
 			text += lines[0];
@@ -43,7 +53,7 @@ function unordered() {
 function ordered() {
 	let text = lines[0].replace(orderedRegexp, '');
 	lines.shift();
-	while (lines.length > 0 && (lines[0] == "" || leadingSpaceRegexp.test(lines[0]) && !listRegexp.test(lines[0]))) {
+	while (moreListLines(lines)) {
 		if (lines[0] == "") {
 			text += "\n"
 		} else {
@@ -142,6 +152,7 @@ function update() {
 				continue;
 			}
 			let prev = NORMAL;
+			html += '<p>\n';
 			for (let block of paragraph) {
 				if (block.type == NORMAL) {
 					if (prev == ORDERED) {
@@ -150,7 +161,8 @@ function update() {
 						html += '</ul>\n';
 					}
 					prev = NORMAL;
-					html += '<p>' + escapeHtml(block.text) + '</p>\n';
+					html += escapeHtml(block.text);
+					html += '\n';
 				} else if (block.type == UNORDERED) {
 					if (prev == ORDERED) {
 						html += '</ol>\n';
@@ -159,11 +171,14 @@ function update() {
 						html += '<ul>\n';
 					}
 					prev = UNORDERED;
-					html += '<li>';
+					html += '	<li>\n';
 					for (let line of block.text.split('\n')) {
-						html += '\n	<p>' + escapeHtml(line) + '</p>';
+						if (line == "") {
+							continue;
+						}
+						html += '		<p>' + escapeHtml(line) + '</p>\n';
 					}
-					html += '</li>\n';
+					html += '	</li>\n';
 				} else if (block.type == ORDERED) {
 					if (prev == UNORDERED) {
 						html += '</ul>\n';
@@ -172,11 +187,14 @@ function update() {
 						html += '<ol>\n';
 					}
 					prev = ORDERED;
-					html += '<li>';
+					html += '	<li>\n';
 					for (let line of block.text.split('\n')) {
-						html += '\n	<p>' + escapeHtml(line) + '</p>';
+						if (line == "") {
+							continue;
+						}
+						html += '		<p>' + escapeHtml(line) + '</p>\n';
 					}
-					html += '</li>\n';
+					html += '	</li>\n';
 				} else if (block.type == PREFORMATTED) {
 					if (prev == ORDERED) {
 						html += '</ol>\n';
@@ -192,6 +210,7 @@ function update() {
 			} else if (prev == UNORDERED) {
 				html += '</ul>\n';
 			}
+			html += '</p>\n';
 		}
 	}
 	console.log("html=\n", html);
@@ -242,7 +261,7 @@ Runs of whitespace within normal text are replaced with a single space.
 
 Lists
 
-A list item starts with a line that begins with whitespace followed by -, *, or a number followed by . or ) and it contains all following lines that are either a single empty line or begin with whitespace and are not themselves list items.
+A list item starts with a line that begins with whitespace followed by -, *, or a number followed by . or ) and it contains all following lines that are either begin with whitespace and are not themselves list items or are a single empty line followed by a line that begins with whitespace and is not a list item.
 
 Text within a list item is in paragraphs of normal text where empty lines within the item denote paragraph breaks.
 
