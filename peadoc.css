@@ -16,6 +16,14 @@ pre {
 	margin-right: 10px;
 }
 
+li > p:first-child {
+	margin-top: 0;
+}
+
+li > p:last-child {
+	margin-bottom: 0;
+}
+
 #raw {
 	grid-column: 1;
 	background-color: #FEF0E8;

@@ -7,74 +7,9 @@
 </head>
 
 <body>
-<script type="module" src="peadoc.js"></script>
-<div id=raw contenteditable=true>Introduction
+<textarea id="raw"></textarea>
+<div id="pretty"></div>
 
-Peadoc is a minimalistic document formatting system useful for documentation in source code. It is intended to be easy-to-read, and out-of-the way in normal text, but also easy to convert to richer formats like HTML.
-
-The intent of Peadoc is not to write papers or books. It is intended for documentation appearing in code such as function comments or library-level comments. As such, it includes only features needed for short documents, and it attempts to avoid special markup syntax beyond items that one may happen to use otherwise when writing a non-marked-up "raw" text (such as - and * for list items).
-
-
-The beginning and the end
-
-Empty lines at the beginning of the file are ignored.
-
-The end-of-file and all immediately preceding empty lines are treated as-if a single empty line.
-
-A text begins at either at the beginning of a new section (full mode) or at the beginning of a paragraph (partial mode).
-
-
-Sections
-
-A section begins with a heading and is followed, optionally, by blocks.
-
-A section heading is a sequence of non-empty lines.
-Runs of non-newline whitespace in a section heading are replaced by single spaces.
-Line-leading whitespace in a section heading is removed.
-
-
-Paragraphs
-
-After a section header is a possibly empty sequence of paragraphs. Paragraphs can contain normal text, lists, and pre-formatted blocks.
-
-A line that does not begin with whitespace is a normal text line.
-A line beginning with whitespace followed by -, *, or a number followed by . or ) begins a list item.
-Any other line beginning with whitespace begins a pre-formatted block.
-
-Two or more blank lines that are not part of a pre-formatted block end the current section and begin a new one.
-A single blank line that is not part of a list item or pre-formatted block ends the paragraph.
-
-
-Normal text
-
-Runs of whitespace within normal text are replaced with a single space.
-
-
-Lists
-
-A list item starts with a line that begins with whitespace followed by -, *, or a number followed by . or ) and it contains all following lines that are either a single empty line or begin with whitespace and are not themselves list items.
-
-Text within a list item is in paragraphs of normal text where empty lines within the item denote paragraph breaks.
-
-A list item preceded by another list item of the same type (unordered/ordered) belongs to the same list. Otherwise it begins a new list within the containing paragraph.
-
-Ordered lists are re-numbered from 1. Lists cannot nest, and they cannot contain pre-formatted text.
-
-
-Pre-formatted text
-
-A block of pre-formatted text starts with a line that begins with whitespace that is not a list item, and it contains all following lines up until the first line that does not begin with a common prefix of leading whitespace.
-
-The longest common prefix of leading whitespace is removed from all lines of the pre-formatted text block. Trailing empty lines are also removed.
-
-
-Hyperlinks
-
-If the final paragraph contains all lines of the form
-    [text]: URL
-then it is interpreted as a bibliography.
-
-In formats where possible, all non-preformatted occurrences of [text] outside the bibliography are replaced by the text as the text of a hyperlink linking to the corresponding URL.</div>
-<div id=pretty></div>
+<script type="text/javascript" src="peadoc.js"></script>
 </body>
 </html>

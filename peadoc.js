@@ -1,9 +1,9 @@
 const EMPTY = "EMPTY";
-const HEADING = "HEADING";
-const TEXT = "TEXT";
+const HEADING = "h1";
+const TEXT = "p";
 const UITEM = "UITEM";
 const OITEM = "OITEM";
-const PRE = "PRE";
+const PRE = "pre";
 
 const ulistPrefix = /^\s+[-*]\s+/;
 const olistPrefix = /^\s+[0-9]+[.\)]\s+/;
@@ -129,58 +129,59 @@ function isSpace(c) {
 	return /\s/.test(c);
 }
 
-function update() {
-	let html = "";
-	let closing = "";
+function update(raw) {
+	let rendered = document.getElementById('pretty');
+	rendered.replaceChildren();
+	let current = [rendered];
 	let prev = EMPTY;
-	const src = document.getElementById('raw').innerText;
-	for (const item of getItems(src)) {
-		if (closing != "" && item.type != prev) {
-			html += closing;
-		}
-		if (item.type == HEADING) {
-			html += "<h1>\n" + escapeLines(item.lines) + "</h1>\n";
-			closing = "";
-		} else if (item.type == TEXT) {
-			html += "<p>\n" + escapeLines(item.lines) + "</p>\n";
-			closing = "";
-		} else if (item.type == PRE) {
-			html += "<pre>\n" + escapeLines(item.lines) + "</pre>\n";
-			closing = "";
-		} else if (item.type == OITEM || item.type == UITEM) {
-			if (prev != item.type) {
-				if (item.type == UITEM) {
-					html += "<ul>\n";
-					closing = "</ul>\n";
-				} else {
-					html += "<ol>\n";
-					closing = "</ol>\n";
-				}
+	for (const item of getItems(raw.value)) {
+		if (item.type != OITEM && item.type != UITEM) {
+			if (prev == OITEM || prev == UITEM) {
+				current.pop();
 			}
+			let e = document.createElement(item.type);
+			for (const line of item.lines){
+				let t = document.createTextNode(line + '\n');
+				e.appendChild(t);
+			}
+			current.at(-1).appendChild(e);
+		} else {
+			if (prev != item.type) {
+				if (prev == OITEM || prev == UITEM) {
+					current.pop();
+				}
+				let l;
+				if (item.type == UITEM) {
+					l = document.createElement('ul');
+				} else {
+					l = document.createElement('ol');
+				}
+				current.at(-1).appendChild(l);
+				current.push(l);
+			}
+			let li = document.createElement('li');
 			if (!hasEmptyLine(item.lines)) {
-				html += "<li>\n" + escapeLines(item.lines) + "</li>\n";
+				for (const line of item.lines){
+					let t = document.createTextNode(line + '\n');
+					li.appendChild(t);
+				}
 			} else {
-				html += "	<li>\n		<p>\n";
+				let p = document.createElement('p');
 				for (const line of item.lines) {
 					if (line == "") {
-						html += "		</p>\n		<p>\n";
+						li.appendChild(p);
+						p = document.createElement('p');
 						continue;
 					}
-					html += escapeHtml(line);
-					html += "\n";
+					let t = document.createTextNode(line + '\n');
+					p.appendChild(t);
 				}
-				html += "		</p>\n	</li>\n";
+				li.appendChild(p);
 			}
-		} else {
-			console.log("impossible item type: ", item.type);
+			current.at(-1).appendChild(li);
 		}
 		prev = item.type;
 	}
-	if (closing != "") {
-		html += closing;
-	}
-	console.log("html=\n", html);
-	document.getElementById('pretty').innerHTML= html;
 }
 
 function hasEmptyLine(lines) {
@@ -192,26 +193,7 @@ function hasEmptyLine(lines) {
 	return false;
 }
 
-function escapeLines(lines) {
-	let html = "";
-	for (const line of lines) {
-		html += escapeHtml(line);
-		html += "\n";
-	}
-	return html;
-}
-
-function escapeHtml(unsafe)
-{
-	return unsafe
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/'/g, "&#039;");
- }
-
-const spec =`
+const spec = `
 Peadoc
 
 Peadoc is a minimalistic document formatting system useful for documentation in source code. It is intended to be easy-to-read, and out-of-the way in normal text, but also easy to convert to richer formats like HTML.
@@ -312,8 +294,9 @@ In formats that support hyperlinks,
 all occurrances of each [text] within non-preformatted items of the document
 are replaced with the text itself (the [ and ] are removed)
 and are made into hyperlinks to the corresponding URL.
-`
+`;
 
-document.getElementById('raw').innerText = spec;
-document.getElementById('raw').addEventListener('input', update);
-update();
+
+document.getElementById('raw').textContent = spec;
+document.getElementById('raw').addEventListener('input', (e) => {update(e.target)});
+update(document.getElementById('raw'));
